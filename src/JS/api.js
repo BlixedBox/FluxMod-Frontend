@@ -207,16 +207,15 @@ export async function apiCall(backendUrl, path, options = {}) {
   });
 
   if (!response.ok) {
-    redirectToStatus(response.status);
     const errorText = await response.text();
-    debugLog("api", "Request returned error response", {
-      method,
-      url: requestUrl,
-      status: response.status,
-      errorText,
-    });
+    debugLog("api", "Error response body", errorText);
+    redirectToStatus(response.status);
     throw new Error(`${response.status}: ${errorText}`);
   }
+
+  // 👇 ADD THIS
+  const data = await response.clone().json().catch(() => null);
+  debugLog("api", "Response JSON", data);
 
   return response;
 }

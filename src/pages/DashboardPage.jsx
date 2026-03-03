@@ -1,53 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import "../Styles/dashboard.css";
 import "../Styles/defaults.css";
 
 export default function DashboardPage({ user }) {
   const username = user?.username || user?.id || "User";
+  const guilds = Array.isArray(user?.guilds) ? user.guilds : [];
 
-  const [guilds, setGuilds] = useState([]);
-  const [isLoadingGuilds, setIsLoadingGuilds] = useState(true);
-  const [guildsError, setGuildsError] = useState("");
+  const getGuildIconUrl = (guild) => {
+    if (!guild) {
+      return "";
+    }
 
-  useEffect(() => {
-    let isMounted = true;
+    if (guild.iconUrl || guild.icon_url) {
+      return guild.iconUrl || guild.icon_url;
+    }
 
-    const loadGuilds = async () => {
-      setIsLoadingGuilds(true);
-      setGuildsError("");
+    if (guild.icon && guild.id) {
+      return `https://fluxerusercontent.com/icons/${guild.id}/${guild.icon}.png`;
+    }
 
-      try {
-        const response = await fetch("/api/guilds", {
-          credentials: "include"
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to load guilds (${response.status})`);
-        }
-
-        const data = await response.json();
-
-        if (isMounted) {
-          setGuilds(Array.isArray(data) ? data : []);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setGuildsError(error?.message || "Unable to load guilds.");
-          setGuilds([]);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingGuilds(false);
-        }
-      }
-    };
-
-    loadGuilds();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    return "";
+  };
 
   return (
     <section className="dashboard">
@@ -79,27 +52,32 @@ export default function DashboardPage({ user }) {
         <h1>Your Guilds</h1>
         <br />
         <div className="dashboard-grid">
-          {isLoadingGuilds && <p className="subtitle">Loading guilds...</p>}
-
-          {!isLoadingGuilds && guildsError && (
-            <p className="subtitle">{guildsError}</p>
-          )}
-
-          {!isLoadingGuilds && !guildsError && guilds.length === 0 && (
+          {guilds.length === 0 && (
             <p className="subtitle">No guilds found for this account.</p>
           )}
 
-          {!isLoadingGuilds &&
-            !guildsError &&
-            guilds.map((guild) => (
+          {guilds.map((guild) => {
+            const guildIconUrl = getGuildIconUrl(guild);
+
+            return (
               <div className="dashboard-card" key={guild.id}>
-                <div className="card-icon servers-icon">
-                  <i className="fa-solid fa-server"></i>
-                </div>
+                {guildIconUrl ? (
+                  <img
+                    className="guild-icon-image"
+                    src={guildIconUrl}
+                    alt={`${guild.name || "Guild"} icon`}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="card-icon servers-icon">
+                    <i className="fa-solid fa-server"></i>
+                  </div>
+                )}
                 <h3>{guild.name || "Unnamed Guild"}</h3>
                 <p className="card-label">ID: {guild.id}</p>
               </div>
-            ))}
+            );
+          })}
         </div>
       </main>
     </section>
