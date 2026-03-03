@@ -29,19 +29,55 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [user, setUser] = useState(null);
 
+  const fetchWithAuthFallback = useCallback(
+    async (path, options = {}) => {
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      const candidates = [];
+
+      try {
+        const backendOrigin = new URL(backendUrl).origin;
+        if (backendOrigin !== window.location.origin) {
+          candidates.push(`${backendUrl}${normalizedPath}`);
+          candidates.push(normalizedPath);
+        } else {
+          candidates.push(normalizedPath);
+        }
+      } catch {
+        candidates.push(`${backendUrl}${normalizedPath}`);
+        candidates.push(normalizedPath);
+      }
+
+      let lastError;
+
+      for (let index = 0; index < candidates.length; index += 1) {
+        const url = candidates[index];
+
+        try {
+          const response = await fetch(url, {
+            credentials: "include",
+            ...options,
+          });
+
+          if ((response.status === 404 || response.status === 405) && index < candidates.length - 1) {
+            continue;
+          }
+
+          return response;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error(`Request failed for ${normalizedPath}`);
+    },
+    [backendUrl]
+  );
+
   const hydrateAuth = useCallback(async () => {
     setIsAuthLoading(true);
 
     try {
-      // Auto-login for localhost development
-      if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-        setUser({ id: "1234", username: "Localhost User" });
-        return;
-      }
-
-      const response = await fetch(`${backendUrl}/api/me`, {
-        credentials: "include",
-      });
+      const response = await fetchWithAuthFallback("/api/me");
 
       if (response.status === 401) {
         setUser(null);
@@ -60,28 +96,27 @@ export default function App() {
     } finally {
       setIsAuthLoading(false);
     }
-  }, [backendUrl]);
+  }, [fetchWithAuthFallback]);
 
   useEffect(() => {
     hydrateAuth();
   }, [hydrateAuth]);
 
   const handleLogin = useCallback(() => {
-    window.location.href = `${backendUrl}/login`;
+    const frontendUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${backendUrl}/login?frontendUrl=${frontendUrl}`;
   }, [backendUrl]);
 
   const handleLogout = useCallback(async () => {
     try {
-      await fetch(`${backendUrl}/logout`, {
-        credentials: "include",
-      });
+      await fetchWithAuthFallback("/logout");
     } catch (error) {
       console.error(error);
     }
 
     setUser(null);
     window.location.href = "/";
-  }, [backendUrl]);
+  }, [fetchWithAuthFallback]);
 
   const isAuthenticated = Boolean(user);
 

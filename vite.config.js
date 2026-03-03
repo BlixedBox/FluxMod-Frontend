@@ -13,6 +13,7 @@ if (DEBUG_ENABLED) {
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: "localhost",
     port: 3000,
   },
 });
