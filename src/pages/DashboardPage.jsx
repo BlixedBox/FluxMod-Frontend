@@ -1,38 +1,53 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "../Styles/dashboard.css";
 import "../Styles/defaults.css";
 
-export default function DashboardPage({ user, guildId }) {
-
+export default function DashboardPage({ user }) {
   const username = user?.username || user?.id || "User";
 
-  const [commandStates, setCommandStates] = useState({
-    kick: true,
-    ban: true,
-    mute: true,
-    warn: true
-  });
+  const [guilds, setGuilds] = useState([]);
+  const [isLoadingGuilds, setIsLoadingGuilds] = useState(true);
+  const [guildsError, setGuildsError] = useState("");
 
-  const toggleCommand = (commandKey) => {
-    const newValue = !commandStates[commandKey];
+  useEffect(() => {
+    let isMounted = true;
 
-    setCommandStates(prev => ({
-      ...prev,
-      [commandKey]: newValue
-    }));
+    const loadGuilds = async () => {
+      setIsLoadingGuilds(true);
+      setGuildsError("");
 
-    fetch("/api/update-command", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        guildId,
-        command: commandKey,
-        enabled: newValue
-      })
-    });
-  };
+      try {
+        const response = await fetch("/api/guilds", {
+          credentials: "include"
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load guilds (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (isMounted) {
+          setGuilds(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGuildsError(error?.message || "Unable to load guilds.");
+          setGuilds([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGuilds(false);
+        }
+      }
+    };
+
+    loadGuilds();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <section className="dashboard">
@@ -61,40 +76,29 @@ export default function DashboardPage({ user, guildId }) {
       </aside>
 
       <main className="main-content">
-        <h1>Commands</h1>
+        <h1>Your Guilds</h1>
         <br />
         <div className="dashboard-grid">
-            {[
-                { name: "Kick", icon: "fa-user-slash", key: "kick", desc: "Remove a member from the server" },
-                { name: "Ban", icon: "fa-hammer", key: "ban", desc: "Permanently ban a member" },
-                { name: "Mute", icon: "fa-volume-xmark", key: "mute", desc: "Timeout a member temporarily" },
-                { name: "Warn", icon: "fa-triangle-exclamation", key: "warn", desc: "Issue a warning to a member" },
-                { name: "Purge", icon: "fa-broom", key: "purge", desc: "Bulk delete messages in a channel" },
-                { name: "AutoMod", icon: "fa-robot", key: "automod", desc: "Automatically moderate content based on rules" }
-            ].map((command) => (
-                <div className="command-card" key={command.key}>
-                
-                <div className="command-left">
-                    <div className="card-icon">
-                    <i className={`fa-solid ${command.icon}`}></i>
-                    </div>
+          {isLoadingGuilds && <p className="subtitle">Loading guilds...</p>}
 
-                    <div className="command-info">
-                    <h3>{command.name}</h3>
-                    <p className="command-description">{command.desc}</p>
-                    </div>
+          {!isLoadingGuilds && guildsError && (
+            <p className="subtitle">{guildsError}</p>
+          )}
+
+          {!isLoadingGuilds && !guildsError && guilds.length === 0 && (
+            <p className="subtitle">No guilds found for this account.</p>
+          )}
+
+          {!isLoadingGuilds &&
+            !guildsError &&
+            guilds.map((guild) => (
+              <div className="dashboard-card" key={guild.id}>
+                <div className="card-icon servers-icon">
+                  <i className="fa-solid fa-server"></i>
                 </div>
-
-                <label className="toggle-switch">
-                    <input
-                    type="checkbox"
-                    checked={commandStates[command.key]}
-                    onChange={() => toggleCommand(command.key)}
-                    />
-                    <span className="slider"></span>
-                </label>
-
-                </div>
+                <h3>{guild.name || "Unnamed Guild"}</h3>
+                <p className="card-label">ID: {guild.id}</p>
+              </div>
             ))}
         </div>
       </main>

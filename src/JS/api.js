@@ -49,8 +49,8 @@ function resolveProductionBackend(origin) {
     return null;
   }
 
-  if (origin.includes("fluxmod-frontend.onrender.com")) {
-    return "https://fluxmod.onrender.com";
+  if (origin.includes("http://localhost:3000")) {
+    return "http://localhost:8000";
   }
 
   return origin;
@@ -95,6 +95,21 @@ export function getBackendUrl() {
 
   const { origin, hostname, protocol } = window.location;
   const storageKey = `backendUrl:${origin}`;
+  const isDevHost = isLocalHost(hostname);
+
+  if (isDevHost) {
+    const devBackendUrl = "http://localhost:8000";
+    const devFrontendUrl = "http://localhost:3000";
+    localStorage.setItem(storageKey, devBackendUrl);
+    localStorage.setItem("backendUrl", devBackendUrl);
+    localStorage.setItem("frontendUrl", devFrontendUrl);
+    debugLog("backend", "Using pinned localhost backend/frontend URL", {
+      storageKey,
+      devBackendUrl,
+      devFrontendUrl,
+    });
+    return devBackendUrl;
+  }
 
   const configured = normalizeBackendUrl(window.BACKEND_URL);
   if (configured) {
@@ -123,8 +138,10 @@ export function getBackendUrl() {
       isProdPage &&
       (isLocalHost(parsed.hostname) ||
         (protocol === "https:" && parsed.protocol !== "https:"));
+    const invalidForDevHost =
+      isDevHost && !isLocalHost(parsed.hostname);
 
-    if (!invalidForProd) {
+    if (!invalidForProd && !invalidForDevHost) {
       debugLog("backend", "Using persisted backend URL", { existing });
       localStorage.setItem(storageKey, existing);
       return existing;
@@ -134,6 +151,7 @@ export function getBackendUrl() {
       existing,
       isProdPage,
       protocol,
+      isDevHost,
     });
     localStorage.removeItem("backendUrl");
     localStorage.removeItem(storageKey);
@@ -147,18 +165,6 @@ export function getBackendUrl() {
       origin,
       backendUrl,
     });
-  }
-
-  if (isLocalHost(hostname)) {
-    const promptUrl = prompt(
-      "Enter backend URL (or press Cancel for http://localhost:8000):",
-      backendUrl
-    );
-    const prompted = normalizeBackendUrl(promptUrl);
-    if (prompted) {
-      backendUrl = prompted;
-      debugLog("backend", "Using prompted backend URL", { backendUrl });
-    }
   }
 
   localStorage.setItem(storageKey, backendUrl);
