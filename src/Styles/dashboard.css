@@ -101,32 +101,45 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sidebar-nav a {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding-left: 14px;
-  border-radius: 8px;
-  color: rgba(165, 180, 252, 0.8);
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: rgba(191, 219, 254, 0.82);
   text-decoration: none;
   font-size: 15px;
-  transition: all 0.2s ease;
+  font-weight: 500;
+  background: rgba(15, 23, 42, 0.25);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+    transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
 }
 
 .sidebar-nav a:hover {
-  background: rgba(99, 102, 241, 0.15);
-  color: #c7d2fe;
-  padding-left: 18px;
+  background: rgba(99, 102, 241, 0.18);
+  color: #dbeafe;
+  border-color: rgba(129, 140, 248, 0.35);
+  transform: translateX(3px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.35);
 }
 
 .sidebar-nav .sidebar-active {
-  background: rgba(99, 102, 241, 0.25);
-  color: #c7d2fe;
-  padding-left: 18px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.28) 0%, rgba(59, 130, 246, 0.2) 100%);
+  color: #e0e7ff;
+  border-color: rgba(129, 140, 248, 0.45);
+  box-shadow: 0 10px 22px rgba(30, 64, 175, 0.28);
+}
+
+.sidebar-nav a:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.85);
+  outline-offset: 2px;
 }
 
 .sidebar-nav a i {
