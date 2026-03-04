@@ -51,7 +51,7 @@ async function handleCreateRuleSubmit(event) {
   try {
     const response = await apiCall(
       backendUrl,
-      `/api/guilds/${encodeURIComponent(guildId)}/rules`,
+      `/api/guilds/rules?guild_id=${encodeURIComponent(guildId)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
