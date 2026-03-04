@@ -57,7 +57,6 @@ export default function AppLayout({
               <span className="user-info">Checking session...</span>
             ) : isAuthenticated ? (
               <>
-                <span className="user-info">{username}</span>
                 <button
                   type="button"
                   id="logout"

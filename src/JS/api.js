@@ -53,6 +53,18 @@ function resolveProductionBackend(origin) {
     return "http://localhost:8000";
   }
 
+  try {
+    const parsed = new URL(origin);
+    const { hostname, protocol } = parsed;
+
+    if (hostname.endsWith(".onrender.com") && hostname.includes("-frontend")) {
+      const backendHost = hostname.replace("-frontend", "");
+      return `${protocol}//${backendHost}`;
+    }
+  } catch {
+    return origin;
+  }
+
   return origin;
 }
 
@@ -134,6 +146,11 @@ export function getBackendUrl() {
   if (existing) {
     const parsed = new URL(existing);
     const isProdPage = !isLocalHost(hostname);
+    const likelyFrontendOriginInRender =
+      isProdPage &&
+      hostname.endsWith(".onrender.com") &&
+      hostname.includes("-frontend") &&
+      parsed.hostname === hostname;
     const invalidForProd =
       isProdPage &&
       (isLocalHost(parsed.hostname) ||
@@ -141,7 +158,7 @@ export function getBackendUrl() {
     const invalidForDevHost =
       isDevHost && !isLocalHost(parsed.hostname);
 
-    if (!invalidForProd && !invalidForDevHost) {
+    if (!invalidForProd && !invalidForDevHost && !likelyFrontendOriginInRender) {
       debugLog("backend", "Using persisted backend URL", { existing });
       localStorage.setItem(storageKey, existing);
       return existing;
@@ -152,6 +169,7 @@ export function getBackendUrl() {
       isProdPage,
       protocol,
       isDevHost,
+      likelyFrontendOriginInRender,
     });
     localStorage.removeItem("backendUrl");
     localStorage.removeItem(storageKey);
