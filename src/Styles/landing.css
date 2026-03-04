@@ -7,6 +7,17 @@
     margin-bottom: 28px;
 }
 
+.home-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-layout .dashboard-grid {
+    width: 100%;
+    margin-top: 4px;
+}
+
 .title-card .fluxmod-logo {
     width: 120px;
     height: auto;

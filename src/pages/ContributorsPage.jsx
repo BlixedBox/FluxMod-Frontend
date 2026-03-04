@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import "../Styles/defaults.css";
 import "../Styles/contributors.css";
 
-const owner = "unclemelo";
-const repo = "FluxMod";
+const owner = "BlixedBox";
+const repos = ["FluxMod-Frontend", "FluxMod-Backend", "FluxMod-Bot"];
 const maintainers = ["unclemelo", "pitr1010", "2chainzz", "8-bit-ball", "Bunn001"];
 
 export default function ContributorsPage() {
@@ -17,15 +17,41 @@ export default function ContributorsPage() {
       try {
         setErrorMessage("");
 
-        const res = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}/contributors`
+        const repoContributors = await Promise.all(
+          repos.map(async (repo) => {
+            const res = await fetch(
+              `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100`
+            );
+
+            if (!res.ok) {
+              throw new Error(`Contributors fetch failed for ${repo}: ${res.status}`);
+            }
+
+            return res.json();
+          })
         );
 
-        if (!res.ok) {
-          throw new Error(`Contributors fetch failed: ${res.status}`);
+        const mergedContributors = new Map();
+        for (const contributorsForRepo of repoContributors) {
+          for (const contributor of contributorsForRepo) {
+            const existing = mergedContributors.get(contributor.login);
+            if (existing) {
+              existing.contributions += contributor.contributions || 0;
+            } else {
+              mergedContributors.set(contributor.login, {
+                login: contributor.login,
+                contributions: contributor.contributions || 0,
+                avatar_url: contributor.avatar_url,
+                url: contributor.url,
+              });
+            }
+          }
         }
 
-        const baseContributors = await res.json();
+        const baseContributors = Array.from(mergedContributors.values()).sort(
+          (left, right) => right.contributions - left.contributions
+        );
+
         const profiles = await Promise.all(
           baseContributors.map(async (contributor) => {
             try {
