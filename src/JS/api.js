@@ -158,7 +158,11 @@ export function getBackendUrl() {
     const invalidForDevHost =
       isDevHost && !isLocalHost(parsed.hostname);
 
-    if (!invalidForProd && !invalidForDevHost && !likelyFrontendOriginInRender) {
+    if (
+      !invalidForProd &&
+      !invalidForDevHost &&
+      !likelyFrontendOriginInRender
+    ) {
       debugLog("backend", "Using persisted backend URL", { existing });
       localStorage.setItem(storageKey, existing);
       return existing;

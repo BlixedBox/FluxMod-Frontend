@@ -50,18 +50,25 @@ export default function App() {
     async (path, options = {}) => {
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       const candidates = [];
+      const isLocalPage =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
 
       try {
         const backendOrigin = new URL(backendUrl).origin;
         if (backendOrigin !== window.location.origin) {
           candidates.push(`${backendUrl}${normalizedPath}`);
-          candidates.push(normalizedPath);
+          if (isLocalPage) {
+            candidates.push(normalizedPath);
+          }
         } else {
           candidates.push(normalizedPath);
         }
       } catch {
         candidates.push(`${backendUrl}${normalizedPath}`);
-        candidates.push(normalizedPath);
+        if (isLocalPage) {
+          candidates.push(normalizedPath);
+        }
       }
 
       let lastError;
