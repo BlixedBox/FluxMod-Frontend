@@ -57,8 +57,8 @@ function resolveProductionBackend(origin) {
     const parsed = new URL(origin);
     const { hostname, protocol } = parsed;
 
-    if (hostname.endsWith(".onrender.com") && hostname.includes("-frontend")) {
-      const backendHost = hostname.replace("-frontend", "");
+    if (hostname === "fluxmod.app") {
+      const backendHost = "api.fluxmod.app";
       return `${protocol}//${backendHost}`;
     }
   } catch {
@@ -148,9 +148,8 @@ export function getBackendUrl() {
     const isProdPage = !isLocalHost(hostname);
     const likelyFrontendOriginInRender =
       isProdPage &&
-      hostname.endsWith(".onrender.com") &&
-      hostname.includes("-frontend") &&
-      parsed.hostname === hostname;
+      parsed.hostname === "fluxmod.app" &&
+      (parsed.protocol === "https:" || parsed.protocol === "http:");
     const invalidForProd =
       isProdPage &&
       (isLocalHost(parsed.hostname) ||
