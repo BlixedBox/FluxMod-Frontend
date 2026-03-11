@@ -125,6 +125,11 @@ const RULE_PRESET_TEMPLATES = {
 
 const RULE_NAME_PRESETS = Object.keys(RULE_PRESET_TEMPLATES);
 const RULE_ACTION_OPTIONS = ["warn", "delete", "timeout", "mute", "kick", "ban"];
+const RULE_SEVERITY_OPTIONS = [
+  { value: 1, label: "Low (log only)" },
+  { value: 2, label: "Medium" },
+  { value: 3, label: "High" },
+];
 
 export function createGuildDashboardController({ backendUrl, appState, defaultImage, navigate }) {
   function uniqueStrings(values) {
@@ -151,6 +156,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     const mergedAllowedKeywords = [];
     const mergedPatterns = [];
     let mergedAction = "warn";
+    let mergedSeverity = 1;
 
     selectedNames.forEach((presetName) => {
       const template = RULE_PRESET_TEMPLATES[presetName];
@@ -162,6 +168,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       mergedAllowedKeywords.push(...parseCommaSeparated(template.allowedKeywords || []));
       mergedPatterns.push(...splitRegexPatterns(template.pattern || ""));
       mergedAction = String(template.action || mergedAction);
+      mergedSeverity = Math.max(mergedSeverity, Number(template.severity || 1));
     });
 
     targetForm.name =
@@ -172,6 +179,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     targetForm.allowedKeywords = uniqueStrings(mergedAllowedKeywords).join(", ");
     targetForm.pattern = uniqueStrings(mergedPatterns).join("\n");
     targetForm.action = mergedAction;
+    targetForm.severity = Math.max(1, Math.min(3, Number(mergedSeverity || 1)));
     return true;
   }
 
@@ -274,6 +282,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         allowedKeywords: "",
         pattern: "",
         action: "warn",
+        severity: 2,
         threshold: 1,
       },
       statusMessage: "",
@@ -287,6 +296,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         allowedKeywords: "",
         pattern: "",
         action: "warn",
+        severity: 2,
         threshold: 1,
         enabled: true,
         exemptRoleIds: "",
@@ -353,6 +363,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       ),
       pattern: rule?.pattern || "",
       action: rule?.action || "warn",
+      severity: Math.max(1, Math.min(3, Number(rule?.severity || 2))),
       threshold: Math.max(1, Number(rule?.threshold || 1)),
       enabled: rule?.enabled !== false,
       exemptRoleIds: normalizeIdList(
@@ -392,6 +403,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       allowedKeywords: String(form.allowedKeywords || "").trim(),
       pattern: String(form.pattern || "").trim(),
       action: String(form.action || "warn"),
+      severity: Math.max(1, Math.min(3, Number(form.severity || 2))),
       threshold: Math.max(1, Number(form.threshold || 1)),
       enabled: Boolean(form.enabled),
       exemptRoleIds: String(form.exemptRoleIds || "").trim(),
@@ -425,6 +437,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       "allowedKeywords",
       "pattern",
       "action",
+      "severity",
       "threshold",
       "enabled",
       "exemptRoleIds",
@@ -451,6 +464,8 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         return "patterns";
       case "action":
         return "action";
+      case "severity":
+        return "severity";
       case "threshold":
         return "threshold";
       case "enabled":
@@ -525,37 +540,6 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     if (!root) {
       return;
     }
-
-    root.querySelectorAll("[data-preset-toggle]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const context = button.getAttribute("data-preset-context") || "";
-        const presetName = button.getAttribute("data-preset-name") || "";
-        if (!context || !presetName || !Object.hasOwn(state.presetSelections, context)) {
-          return;
-        }
-
-        const selected = Array.isArray(state.presetSelections[context])
-          ? [...state.presetSelections[context]]
-          : [];
-        const existingIndex = selected.indexOf(presetName);
-        if (existingIndex >= 0) {
-          selected.splice(existingIndex, 1);
-        } else {
-          selected.push(presetName);
-        }
-
-        state.presetSelections[context] = selected;
-
-        if (context === "create" && selected.length > 0) {
-          applyRulePresets(state.automodForm, selected);
-        }
-        if (context === "inlineEdit" && selected.length > 0) {
-          applyRulePresets(state.editingRuleForm, selected);
-        }
-
-        rerenderKeepingInput(renderContent);
-      });
-    });
 
     const user = appState.user || {};
     const guilds = Array.isArray(user?.guilds) ? user.guilds : [];
@@ -656,6 +640,16 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
                             ${RULE_ACTION_OPTIONS.map(
                               (action) =>
                                 `<option value="${escapeHtml(action)}" ${state.editingRuleForm.action === action ? "selected" : ""}>${escapeHtml(action.charAt(0).toUpperCase() + action.slice(1))}</option>`
+                            ).join("")}
+                          </select>
+                        </label>
+
+                        <label class="automod-rule-label">
+                          Severity
+                          <select name="severity" data-edit-input>
+                            ${RULE_SEVERITY_OPTIONS.map(
+                              (option) =>
+                                `<option value="${option.value}" ${Number(state.editingRuleForm.severity || 2) === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`
                             ).join("")}
                           </select>
                         </label>
@@ -816,6 +810,17 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
             </select>
           </label>
 
+          <label class="automod-rule-label">
+            Severity
+            <select name="severity">
+              ${RULE_SEVERITY_OPTIONS.map(
+                (option) =>
+                  `<option value="${option.value}" ${Number(state.automodForm.severity || 2) === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`
+              ).join("")}
+            </select>
+            <span class="field-hint">Low severity only logs to staff and will not delete the message.</span>
+          </label>
+
           <button type="submit" ${state.isSubmittingRule || hasReachedRuleLimit || isCreateLimitExceeded ? "disabled" : ""}>
             ${state.isSubmittingRule ? "Saving..." : "Create AutoMod Rule"}
           </button>
@@ -839,6 +844,37 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     if (backButton) {
       backButton.addEventListener("click", () => navigate("/pages/dashboard.html"));
     }
+
+    root.querySelectorAll("[data-preset-toggle]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const context = button.getAttribute("data-preset-context") || "";
+        const presetName = button.getAttribute("data-preset-name") || "";
+        if (!context || !presetName || !Object.hasOwn(state.presetSelections, context)) {
+          return;
+        }
+
+        const selected = Array.isArray(state.presetSelections[context])
+          ? [...state.presetSelections[context]]
+          : [];
+        const existingIndex = selected.indexOf(presetName);
+        if (existingIndex >= 0) {
+          selected.splice(existingIndex, 1);
+        } else {
+          selected.push(presetName);
+        }
+
+        state.presetSelections[context] = selected;
+
+        if (context === "create" && selected.length > 0) {
+          applyRulePresets(state.automodForm, selected);
+        }
+        if (context === "inlineEdit" && selected.length > 0) {
+          applyRulePresets(state.editingRuleForm, selected);
+        }
+
+        rerenderKeepingInput(renderContent);
+      });
+    });
 
     wireEvents(guildId, state, isCreateLimitExceeded, isEditLimitExceeded);
   }
@@ -867,6 +903,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         state.automodForm.allowedKeywords = String(formData.get("allowedKeywords") || "");
         state.automodForm.pattern = String(formData.get("pattern") || "");
         state.automodForm.action = String(formData.get("action") || "warn");
+        state.automodForm.severity = Math.max(1, Math.min(3, Number(formData.get("severity") || 2)));
         rerenderKeepingInput(renderContent);
       });
 
@@ -1288,6 +1325,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
           allowedKeywords: allowedKeywordTokens,
           pattern: compiledPattern,
           action: state.automodForm.action,
+          severity: Math.max(1, Math.min(3, Number(state.automodForm.severity || 2))),
           threshold: state.automodForm.threshold,
           enabled: true,
         }),
@@ -1372,6 +1410,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       allowedKeywords: editAllowedKeywordTokens,
       pattern: compiledPattern,
       action: state.editingRuleForm.action,
+      severity: Math.max(1, Math.min(3, Number(state.editingRuleForm.severity || 2))),
       threshold: Math.max(1, Number(state.editingRuleForm.threshold || 1)),
       enabled: state.editingRuleForm.enabled,
       exempt_role_ids: exemptRoleIds,
@@ -1416,6 +1455,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       allowedKeywords: editAllowedKeywordTokens,
       pattern: compiledPattern,
       action: String(state.editingRuleForm.action || "warn"),
+      severity: Math.max(1, Math.min(3, Number(state.editingRuleForm.severity || 2))),
       threshold: Math.max(1, Number(state.editingRuleForm.threshold || 1)),
       enabled: Boolean(state.editingRuleForm.enabled),
       exemptRoleIds,
@@ -1444,6 +1484,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
           areIdListsEqual(updatedComparable.allowedKeywords, expectedRuleFields.allowedKeywords) &&
           String(updatedComparable.pattern || "").trim() === expectedRuleFields.pattern &&
           String(updatedComparable.action || "warn") === expectedRuleFields.action &&
+          Math.max(1, Math.min(3, Number(updatedComparable.severity || 2))) === expectedRuleFields.severity &&
           Math.max(1, Number(updatedComparable.threshold || 1)) === expectedRuleFields.threshold &&
           Boolean(updatedComparable.enabled) === expectedRuleFields.enabled &&
           areIdListsEqual(updatedComparable.exemptRoleIds, expectedRuleFields.exemptRoleIds) &&
@@ -1490,6 +1531,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
             allowedKeywords: expectedRuleFields.allowedKeywords,
             pattern: expectedRuleFields.pattern,
             action: expectedRuleFields.action,
+            severity: expectedRuleFields.severity,
             threshold: expectedRuleFields.threshold,
             enabled: expectedRuleFields.enabled,
             exempt_roles: expectedRuleFields.exemptRoleIds,
@@ -1854,6 +1896,17 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
                   `<option value="${escapeHtml(action)}" ${state.editingRuleForm.action === action ? "selected" : ""}>${escapeHtml(action.charAt(0).toUpperCase() + action.slice(1))}</option>`
               ).join("")}
             </select>
+          </label>
+
+          <label class="automod-rule-label">
+            Severity
+            <select name="severity" data-edit-input>
+              ${RULE_SEVERITY_OPTIONS.map(
+                (option) =>
+                  `<option value="${option.value}" ${Number(state.editingRuleForm.severity || 2) === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`
+              ).join("")}
+            </select>
+            <span class="field-hint">Low severity only logs to staff and will not delete the message.</span>
           </label>
 
           <label class="automod-rule-label">

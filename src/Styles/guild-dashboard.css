@@ -81,6 +81,11 @@
   font-size: 0.88rem;
 }
 
+.automod-preset-control {
+  grid-column: 1 / -1;
+  order: -1;
+}
+
 .automod-rule-label input,
 .automod-rule-label select,
 .automod-rule-label textarea {
@@ -167,7 +172,7 @@
 .automod-form input,
 .automod-form select,
 .automod-form textarea,
-.automod-form button {
+.automod-form > button {
   border-radius: 10px;
   border: 1px solid rgba(149, 182, 229, 0.32);
   padding: 0.6rem 0.72rem;
@@ -198,7 +203,7 @@
   color: var(--text);
 }
 
-.automod-form button {
+.automod-form > button {
   background: linear-gradient(140deg, var(--accent-blue) 0%, var(--accent-darker-blue) 100%);
   color: #f5fbff;
   border-color: rgba(102, 186, 255, 0.5);
@@ -214,7 +219,7 @@
   grid-column: span 2;
 }
 
-.automod-form button:hover {
+.automod-form > button:hover {
   filter: brightness(1.07);
 }
 
@@ -406,7 +411,7 @@
     grid-template-columns: 1fr;
   }
 
-  .automod-form button {
+  .automod-form > button {
     grid-column: span 1;
   }
 
