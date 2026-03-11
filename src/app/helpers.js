@@ -258,6 +258,26 @@ export function normalizeAutomodSettings(payload = {}) {
     []
   );
 
+  const staffRoles = pickDefinedValue(
+    source?.staff_role_ids,
+    source?.staffRoleIds,
+    source?.staff_roles,
+    source?.staffRoles,
+    source?.staff_ping_role_ids,
+    source?.staffPingRoleIds,
+    source?.automod_ping_role_ids,
+    source?.automodPingRoleIds,
+    commandSettings?.staff_role_ids,
+    commandSettings?.staffRoleIds,
+    commandSettings?.staff_roles,
+    commandSettings?.staffRoles,
+    commandSettings?.staff_ping_role_ids,
+    commandSettings?.staffPingRoleIds,
+    commandSettings?.automod_ping_role_ids,
+    commandSettings?.automodPingRoleIds,
+    []
+  );
+
   const exemptChannels = pickDefinedValue(
     source?.exempt_channel_ids,
     source?.exemptChannelIds,
@@ -280,6 +300,7 @@ export function normalizeAutomodSettings(payload = {}) {
 
   return {
     logChannelId: String(logChannelId || "").trim(),
+    staffRoleIds: normalizeIdList(staffRoles),
     exemptRoleIds: normalizeIdList(exemptRoles),
     exemptChannelIds: normalizeIdList(exemptChannels),
     exemptUserIds: normalizeIdList(exemptUsers),

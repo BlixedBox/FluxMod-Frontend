@@ -125,6 +125,7 @@ const RULE_PRESET_TEMPLATES = {
 
 const RULE_NAME_PRESETS = Object.keys(RULE_PRESET_TEMPLATES);
 const RULE_ACTION_OPTIONS = ["warn", "delete", "timeout", "mute", "kick", "ban"];
+const MAX_STAFF_PING_ROLES = 5;
 const RULE_SEVERITY_OPTIONS = [
   { value: 1, label: "Low (log only)" },
   { value: 2, label: "Medium" },
@@ -309,12 +310,14 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       deletingRuleId: "",
       automodSettingsForm: {
         logChannelId: "",
+        staffRoleIds: "",
         exemptRoleIds: "",
         exemptChannelIds: "",
         exemptUserIds: "",
       },
       automodSettingsOriginal: {
         logChannelId: "",
+        staffRoleIds: "",
         exemptRoleIds: "",
         exemptChannelIds: "",
         exemptUserIds: "",
@@ -494,6 +497,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
   function didSettingsPersist(expected, actual) {
     return (
       String(expected.logChannelId || "").trim() === String(actual.logChannelId || "").trim() &&
+      areIdListsEqual(expected.staffRoleIds, actual.staffRoleIds) &&
       areIdListsEqual(expected.exemptRoleIds, actual.exemptRoleIds) &&
       areIdListsEqual(expected.exemptChannelIds, actual.exemptChannelIds) &&
       areIdListsEqual(expected.exemptUserIds, actual.exemptUserIds)
@@ -503,6 +507,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
   function toComparableSettingsForm(form = {}) {
     return {
       logChannelId: String(form.logChannelId || "").trim(),
+      staffRoleIds: String(form.staffRoleIds || "").trim(),
       exemptRoleIds: String(form.exemptRoleIds || "").trim(),
       exemptChannelIds: String(form.exemptChannelIds || "").trim(),
       exemptUserIds: String(form.exemptUserIds || "").trim(),
@@ -729,6 +734,12 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
           <label class="automod-rule-label">
             AutoMod Log Channel ID
             <input name="logChannelId" value="${escapeHtml(state.automodSettingsForm.logChannelId)}" placeholder="123456789012345678" />
+          </label>
+
+          <label class="automod-rule-label">
+            Staff Ping Role IDs (max 5, comma-separated)
+            <input name="staffRoleIds" value="${escapeHtml(state.automodSettingsForm.staffRoleIds)}" placeholder="111111111111111111, 222222222222222222" />
+            <span class="token-counter">${parseCommaSeparated(state.automodSettingsForm.staffRoleIds).length} / ${MAX_STAFF_PING_ROLES} roles</span>
           </label>
 
           <label class="automod-rule-label">
@@ -1087,6 +1098,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       return (
         fallbackSettings || {
           logChannelId: "",
+          staffRoleIds: "",
           exemptRoleIds: "",
           exemptChannelIds: "",
           exemptUserIds: "",
@@ -1117,6 +1129,14 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
 
     const logChannelId = state.automodSettingsForm.logChannelId.trim();
     const logChannelIdNullable = logChannelId || null;
+    const requestedStaffRoleIds = parseCommaSeparated(state.automodSettingsForm.staffRoleIds);
+    if (requestedStaffRoleIds.length > MAX_STAFF_PING_ROLES) {
+      state.statusMessage = `Staff ping roles exceed max limit (${MAX_STAFF_PING_ROLES}).`;
+      return;
+    }
+    const staffRoleIdsCsv = state.automodSettingsForm.staffRoleIds.trim();
+    const staffRoleIds = requestedStaffRoleIds.slice(0, MAX_STAFF_PING_ROLES);
+    const staffRoleIdsNullable = staffRoleIds.length > 0 ? staffRoleIds : null;
     const exemptRoleIdsCsv = state.automodSettingsForm.exemptRoleIds.trim();
     const exemptRoleIds = parseCommaSeparated(state.automodSettingsForm.exemptRoleIds);
     const exemptRoleIdsNullable = exemptRoleIds.length > 0 ? exemptRoleIds : null;
@@ -1138,6 +1158,15 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       // Nullable aliases help backends clear saved channel values when user removes them.
       log_channel_id_nullable: logChannelIdNullable,
       automod_log_channel_nullable: logChannelIdNullable,
+      staff_role_ids: staffRoleIds,
+      staff_roles: staffRoleIds,
+      staff_ping_role_ids: staffRoleIds,
+      automod_ping_role_ids: staffRoleIds,
+      staff_role_ids_csv: staffRoleIdsCsv,
+      staff_roles_csv: staffRoleIdsCsv,
+      staff_role_ids_nullable: staffRoleIdsNullable,
+      staff_roles_nullable: staffRoleIdsNullable,
+      staffRoleIds,
       exempt_role_ids: exemptRoleIds,
       exempt_roles: exemptRoleIds,
       exempt_role_ids_csv: exemptRoleIdsCsv,
@@ -1174,6 +1203,10 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
       command_settings: {
         automod_log_channel: logChannelId,
         automod_log_channel_id: logChannelId,
+        staff_role_ids: staffRoleIds,
+        staff_roles: staffRoleIds,
+        staff_ping_role_ids: staffRoleIds,
+        automod_ping_role_ids: staffRoleIds,
         exempt_role_ids: exemptRoleIds,
         exempt_channel_ids: exemptChannelIds,
         exempt_user_ids: exemptUserIds,
@@ -1185,6 +1218,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
 
     const expectedSettings = {
       logChannelId,
+      staffRoleIds,
       exemptRoleIds,
       exemptChannelIds,
       exemptUserIds,
@@ -1939,6 +1973,17 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
             />
           </label>
 
+          <label class="automod-rule-label">
+            Staff Ping Role IDs (max 5, comma-separated)
+            <input
+              name="staffRoleIds"
+              value="${escapeHtml(state.automodSettingsForm.staffRoleIds)}"
+              data-editor-setting
+              placeholder="111111111111111111, 222222222222222222"
+            />
+            <span class="token-counter">${parseCommaSeparated(state.automodSettingsForm.staffRoleIds).length} / ${MAX_STAFF_PING_ROLES} roles</span>
+          </label>
+
           <label class="automod-enabled-label">
             <input type="checkbox" name="enabled" ${state.editingRuleForm.enabled ? "checked" : ""} data-edit-input />
             Enabled
@@ -2041,6 +2086,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         }
 
         state.automodSettingsForm[name] = input.value;
+        rerenderKeepingInput(renderRuleEditorContent);
       });
     });
 
