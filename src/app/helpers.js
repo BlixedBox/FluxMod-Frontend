@@ -420,3 +420,140 @@ export function resolveGuildId(search) {
 export function isLocalPage() {
   return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 }
+
+// LHS Settings normalization
+
+const LHS_CATEGORY_IDS = [
+  "dangerous_content",
+  "hate_speech",
+  "harassment",
+  "sexually_explicit",
+  "toxicity",
+  "severe_toxicity",
+  "threat",
+  "insult",
+  "identity_attack",
+  "phish",
+  "spam",
+];
+
+const DEFAULT_LHS_THRESHOLD = 0.55;
+
+function pickDefinedValue(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate !== undefined && candidate !== null) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+function normalizeCategorySettings(categories = {}) {
+  const normalized = {};
+  
+  for (const catId of LHS_CATEGORY_IDS) {
+    const catData = categories[catId] || {};
+    normalized[catId] = {
+      enabled: catData.enabled !== false, // Default true
+      threshold: Math.max(0, Math.min(1, 
+        Number(pickDefinedValue(catData.threshold, catData.threshold_value, DEFAULT_LHS_THRESHOLD)) || DEFAULT_LHS_THRESHOLD
+      )),
+    };
+  }
+  
+  return normalized;
+}
+
+function normalizeChannelOverrides(overrides = {}) {
+  const normalized = {};
+  
+  for (const [channelId, override] of Object.entries(overrides)) {
+    if (!channelId || !override) continue;
+    
+    normalized[channelId] = {
+      enabled: override.enabled !== false,
+      global_threshold: Math.max(0, Math.min(1,
+        Number(pickDefinedValue(override.global_threshold, override.threshold, DEFAULT_LHS_THRESHOLD)) || DEFAULT_LHS_THRESHOLD
+      )),
+      categories: normalizeCategorySettings(override.categories),
+      action: String(override.action || "delete"),
+      severity: Math.max(1, Math.min(3, Number(override.severity) || 2)),
+      log_only_mode: override.log_only_mode === true,
+    };
+  }
+  
+  return normalized;
+}
+
+export function normalizeLHSSettings(payload = {}) {
+  const root = payload || {};
+  const data = root?.data || {};
+  const settings = root?.settings || {};
+  const lhs = root?.lhs_settings || root?.lhsSettings || {};
+  
+  // Some endpoints return settings under different wrappers
+  const source = {
+    ...root,
+    ...data,
+    ...settings,
+    ...lhs,
+  };
+  
+  const globalThreshold = Math.max(0, Math.min(1,
+    Number(pickDefinedValue(
+      source.global_threshold,
+      source.globalThreshold,
+      source.threshold,
+      DEFAULT_LHS_THRESHOLD
+    )) || DEFAULT_LHS_THRESHOLD
+  ));
+  
+  const normalized = {
+    enabled: pickDefinedValue(source.enabled, source.lhs_enabled, source.lhsEnabled) === true,
+    global_threshold: globalThreshold,
+    categories: normalizeCategorySettings(source.categories),
+    exempt_roles: pickDefinedValue(source.exempt_roles, source.exemptRoles, source.exempt_role_ids, source.exemptRoleIds) || [],
+    exempt_channels: pickDefinedValue(source.exempt_channels, source.exemptChannels, source.exempt_channel_ids, source.exemptChannelIds) || [],
+    exempt_users: pickDefinedValue(source.exempt_users, source.exemptUsers, source.exempt_user_ids, source.exemptUserIds) || [],
+    action: String(pickDefinedValue(source.action, source.default_action, source.defaultAction) || "delete"),
+    severity: Math.max(1, Math.min(3, Number(pickDefinedValue(source.severity, source.default_severity, source.defaultSeverity)) || 2)),
+    log_only_mode: pickDefinedValue(source.log_only_mode, source.logOnlyMode, source.log_only) === true,
+    channel_overrides: normalizeChannelOverrides(source.channel_overrides || source.channelOverrides),
+  };
+  
+  return normalized;
+}
+
+export function formatLHSCategoryName(categoryId) {
+  const names = {
+    dangerous_content: "Dangerous Content",
+    hate_speech: "Hate Speech",
+    harassment: "Harassment",
+    sexually_explicit: "Sexually Explicit",
+    toxicity: "Toxicity",
+    severe_toxicity: "Severe Toxicity",
+    threat: "Threat",
+    insult: "Insult",
+    identity_attack: "Identity Attack",
+    phish: "Phishing",
+    spam: "Spam",
+  };
+  return names[categoryId] || categoryId;
+}
+
+export function formatLHSCategoryDescription(categoryId) {
+  const descriptions = {
+    dangerous_content: "Content promoting dangerous or illegal activities",
+    hate_speech: "Content attacking protected groups",
+    harassment: "Content targeting individuals for harassment",
+    sexually_explicit: "Sexual or NSFW content",
+    toxicity: "General toxic behavior",
+    severe_toxicity: "Extremely toxic or hateful content",
+    threat: "Threats of violence or harm",
+    insult: "Personal insults or attacks",
+    identity_attack: "Attacks based on identity characteristics",
+    phish: "Phishing attempts or suspicious links",
+    spam: "Spam or repetitive unwanted content",
+  };
+  return descriptions[categoryId] || "";
+}

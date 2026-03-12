@@ -1,4 +1,10 @@
-import { MAX_AUTOMOD_RULES, MAX_REGEXES, MAX_WORDS } from "./constants.js";
+import { 
+  MAX_AUTOMOD_RULES, 
+  MAX_REGEXES, 
+  MAX_WORDS, 
+  LHS_CATEGORIES,
+  DEFAULT_LHS_THRESHOLD,
+} from "./constants.js";
 import {
   escapeHtml,
   getGuildIconUrl,
@@ -12,6 +18,9 @@ import {
   parseCommaSeparated,
   splitRegexPatterns,
   resolveGuildId,
+  normalizeLHSSettings,
+  formatLHSCategoryName,
+  formatLHSCategoryDescription,
 } from "./helpers.js";
 
 function resolveRuleId(search) {
@@ -341,6 +350,22 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         inlineEdit: [],
         editor: [],
       },
+      // LHS (AI Moderation) state
+      lhsSettings: {
+        enabled: false,
+        global_threshold: DEFAULT_LHS_THRESHOLD,
+        categories: {},
+        exemptRoleIds: "",
+        exemptChannelIds: "",
+        exemptUserIds: "",
+        action: "delete",
+        severity: 2,
+        logOnlyMode: false,
+      },
+      lhsSettingsOriginal: null,
+      isLoadingLHS: false,
+      isSavingLHS: false,
+      lhsExpanded: false, // UI state for collapsible section
     };
   }
 
@@ -769,6 +794,151 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
           </label>
         </section>
 
+        <!-- LHS (AI Moderation) Settings Section -->
+        <section class="lhs-settings-section content-section" id="lhs-settings-section">
+          <div class="lhs-header" id="lhs-header-toggle">
+            <h4 class="automod-rules-title">
+              <i class="fa-solid fa-robot"></i>
+              AI Moderation (LHS)
+              <span class="lhs-status-badge ${state.lhsSettings.enabled ? 'enabled' : 'disabled'}">
+                ${state.lhsSettings.enabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </h4>
+            <button type="button" class="action-btn secondary" id="lhs-toggle-expand">
+              ${state.lhsExpanded ? 'Collapse' : 'Expand'}
+            </button>
+          </div>
+          
+          ${state.lhsExpanded ? `
+          <div class="lhs-content">
+            <p class="field-hint lhs-description">
+              LHS (Language Harm Scanner) uses AI to detect harmful content across 11 categories. 
+              By default, this feature is disabled and must be explicitly enabled.
+            </p>
+
+            ${state.isLoadingLHS ? '<p class="subtitle">Loading AI moderation settings...</p>' : ''}
+            
+            <div class="lhs-form" id="lhs-form">
+              <!-- Master Enable Toggle -->
+              <label class="automod-enabled-label lhs-master-toggle">
+                <input type="checkbox" name="lhsEnabled" ${state.lhsSettings.enabled ? "checked" : ""} />
+                <strong>Enable AI Moderation</strong>
+                <span class="field-hint">When enabled, messages will be analyzed by the AI model</span>
+              </label>
+
+              <!-- Global Threshold -->
+              <label class="automod-rule-label">
+                Global Threshold
+                <input 
+                  type="range" 
+                  name="lhsGlobalThreshold" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value="${state.lhsSettings.global_threshold}" 
+                />
+                <span class="threshold-value">${(state.lhsSettings.global_threshold * 100).toFixed(0)}%</span>
+                <span class="field-hint">Default: 55%. Lower values = more strict, higher values = more lenient</span>
+              </label>
+
+              <!-- Action Settings -->
+              <div class="lhs-action-settings">
+                <label class="automod-rule-label">
+                  Default Action
+                  <select name="lhsAction">
+                    ${RULE_ACTION_OPTIONS.map(
+                      (action) =>
+                        `<option value="${escapeHtml(action)}" ${state.lhsSettings.action === action ? "selected" : ""}>${escapeHtml(formatActionLabel(action))}</option>`
+                    ).join("")}
+                  </select>
+                </label>
+
+                <label class="automod-rule-label">
+                  Severity Level
+                  <select name="lhsSeverity">
+                    ${RULE_SEVERITY_OPTIONS.map(
+                      (option) =>
+                        `<option value="${option.value}" ${Number(state.lhsSettings.severity || 2) === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`
+                    ).join("")}
+                  </select>
+                  <span class="field-hint">Low severity only logs violations without taking action</span>
+                </label>
+
+                <label class="automod-enabled-label">
+                  <input type="checkbox" name="lhsLogOnlyMode" ${state.lhsSettings.logOnlyMode ? "checked" : ""} />
+                  Log Only Mode (no actions taken)
+                </label>
+              </div>
+
+              <!-- Exemptions -->
+              <div class="lhs-exemptions">
+                <h5>Exemptions</h5>
+                
+                <label class="automod-rule-label">
+                  Exempt Role IDs (comma-separated)
+                  <input name="lhsExemptRoleIds" value="${escapeHtml(state.lhsSettings.exemptRoleIds)}" placeholder="111111111111111111, 222222222222222222" />
+                </label>
+
+                <label class="automod-rule-label">
+                  Exempt Channel IDs (comma-separated)
+                  <input name="lhsExemptChannelIds" value="${escapeHtml(state.lhsSettings.exemptChannelIds)}" placeholder="333333333333333333, 444444444444444444" />
+                </label>
+
+                <label class="automod-rule-label">
+                  Exempt User IDs (comma-separated)
+                  <input name="lhsExemptUserIds" value="${escapeHtml(state.lhsSettings.exemptUserIds)}" placeholder="555555555555555555, 666666666666666666" />
+                </label>
+              </div>
+
+              <!-- Category Toggles -->
+              <div class="lhs-categories">
+                <h5>Detection Categories</h5>
+                <p class="field-hint">Enable/disable individual detection categories and set per-category thresholds</p>
+                
+                <div class="lhs-category-grid">
+                  ${LHS_CATEGORIES.map((cat) => {
+                    const catSettings = state.lhsSettings.categories[cat.id] || { enabled: true, threshold: state.lhsSettings.global_threshold };
+                    return `
+                      <div class="lhs-category-item">
+                        <label class="lhs-category-toggle">
+                          <input type="checkbox" name="lhsCat_${cat.id}" ${catSettings.enabled !== false ? "checked" : ""} />
+                          <span class="lhs-category-name">${escapeHtml(cat.name)}</span>
+                        </label>
+                        <label class="lhs-category-threshold">
+                          <input 
+                            type="range" 
+                            name="lhsCatThreshold_${cat.id}" 
+                            min="0" 
+                            max="1" 
+                            step="0.01" 
+                            value="${catSettings.threshold || state.lhsSettings.global_threshold}" 
+                            ${catSettings.enabled === false ? "disabled" : ""}
+                          />
+                          <span class="threshold-value">${((catSettings.threshold || state.lhsSettings.global_threshold) * 100).toFixed(0)}%</span>
+                        </label>
+                        <span class="field-hint">${escapeHtml(cat.description)}</span>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>
+
+              <!-- Save Button -->
+              <div class="lhs-actions">
+                <button type="button" class="action-btn" id="lhs-save-btn" ${state.isSavingLHS ? "disabled" : ""}>
+                  ${state.isSavingLHS ? "Saving..." : "Save AI Moderation Settings"}
+                </button>
+                ${state.lhsSettingsOriginal ? `
+                  <button type="button" class="action-btn secondary" id="lhs-reset-btn">
+                    Reset Changes
+                  </button>
+                ` : ""}
+              </div>
+            </div>
+          </div>
+          ` : ''}
+        </section>
+
         <form class="automod-form" id="automod-create-form">
           <label class="automod-rule-label">
             Rule Name
@@ -1059,6 +1229,87 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
         }
       }
     });
+
+    // LHS Event Handlers
+    const lhsHeaderToggle = document.getElementById("lhs-header-toggle");
+    if (lhsHeaderToggle) {
+      lhsHeaderToggle.addEventListener("click", (e) => {
+        // Don't toggle if clicking on the checkbox
+        if (e.target.name === "lhsEnabled") return;
+        state.lhsExpanded = !state.lhsExpanded;
+        renderContent();
+      });
+    }
+
+    const lhsToggleExpand = document.getElementById("lhs-toggle-expand");
+    if (lhsToggleExpand) {
+      lhsToggleExpand.addEventListener("click", (e) => {
+        e.stopPropagation();
+        state.lhsExpanded = !state.lhsExpanded;
+        renderContent();
+      });
+    }
+
+    const lhsForm = document.getElementById("lhs-form");
+    if (lhsForm) {
+      // Handle all LHS form inputs
+      lhsForm.addEventListener("input", (event) => {
+        const target = event.target;
+        const name = target.name;
+        
+        if (!name) return;
+
+        if (name === "lhsEnabled") {
+          state.lhsSettings.enabled = target.checked;
+        } else if (name === "lhsGlobalThreshold") {
+          state.lhsSettings.global_threshold = parseFloat(target.value);
+        } else if (name === "lhsAction") {
+          state.lhsSettings.action = target.value;
+        } else if (name === "lhsSeverity") {
+          state.lhsSettings.severity = parseInt(target.value, 10);
+        } else if (name === "lhsLogOnlyMode") {
+          state.lhsSettings.logOnlyMode = target.checked;
+        } else if (name === "lhsExemptRoleIds") {
+          state.lhsSettings.exemptRoleIds = target.value;
+        } else if (name === "lhsExemptChannelIds") {
+          state.lhsSettings.exemptChannelIds = target.value;
+        } else if (name === "lhsExemptUserIds") {
+          state.lhsSettings.exemptUserIds = target.value;
+        } else if (name.startsWith("lhsCat_")) {
+          const catId = name.replace("lhsCat_", "");
+          if (!state.lhsSettings.categories[catId]) {
+            state.lhsSettings.categories[catId] = {};
+          }
+          state.lhsSettings.categories[catId].enabled = target.checked;
+        } else if (name.startsWith("lhsCatThreshold_")) {
+          const catId = name.replace("lhsCatThreshold_", "");
+          if (!state.lhsSettings.categories[catId]) {
+            state.lhsSettings.categories[catId] = {};
+          }
+          state.lhsSettings.categories[catId].threshold = parseFloat(target.value);
+        }
+        
+        rerenderKeepingInput(renderContent);
+      });
+
+      // Save button
+      const lhsSaveBtn = document.getElementById("lhs-save-btn");
+      if (lhsSaveBtn) {
+        lhsSaveBtn.addEventListener("click", async () => {
+          await saveLHSSettings(guildId, state);
+          renderContent();
+        });
+      }
+
+      // Reset button
+      const lhsResetBtn = document.getElementById("lhs-reset-btn");
+      if (lhsResetBtn && state.lhsSettingsOriginal) {
+        lhsResetBtn.addEventListener("click", () => {
+          state.lhsSettings = JSON.parse(JSON.stringify(state.lhsSettingsOriginal));
+          renderContent();
+        });
+      }
+    }
   }
 
   async function loadSettings(guildId, state) {
@@ -2238,6 +2489,126 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     });
   }
 
+  // LHS Settings Functions
+
+  async function loadLHSSettings(guildId, state) {
+    if (!guildId) {
+      return;
+    }
+
+    state.isLoadingLHS = true;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/guilds/lhs-settings?guild_id=${encodeURIComponent(guildId)}`,
+        { method: "GET", credentials: "include" }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          // LHS settings not found, use defaults
+          state.lhsSettings = {
+            enabled: false,
+            global_threshold: DEFAULT_LHS_THRESHOLD,
+            categories: {},
+            exemptRoleIds: "",
+            exemptChannelIds: "",
+            exemptUserIds: "",
+            action: "delete",
+            severity: 2,
+            logOnlyMode: false,
+          };
+          state.lhsSettingsOriginal = null;
+          return;
+        }
+        throw new Error(`Failed to load LHS settings (${response.status})`);
+      }
+
+      const payload = await response.json();
+      const normalized = normalizeLHSSettings(payload);
+
+      // Convert arrays to comma-separated strings for form inputs
+      state.lhsSettings = {
+        enabled: normalized.enabled,
+        global_threshold: normalized.global_threshold,
+        categories: normalized.categories || {},
+        exemptRoleIds: Array.isArray(normalized.exempt_roles) 
+          ? normalized.exempt_roles.join(", ") 
+          : "",
+        exemptChannelIds: Array.isArray(normalized.exempt_channels) 
+          ? normalized.exempt_channels.join(", ") 
+          : "",
+        exemptUserIds: Array.isArray(normalized.exempt_users) 
+          ? normalized.exempt_users.join(", ") 
+          : "",
+        action: normalized.action,
+        severity: normalized.severity,
+        logOnlyMode: normalized.log_only_mode,
+      };
+
+      state.lhsSettingsOriginal = JSON.parse(JSON.stringify(state.lhsSettings));
+    } catch (error) {
+      console.error("Failed to load LHS settings:", error);
+      state.statusMessage = error?.message || "Failed to load AI moderation settings.";
+    } finally {
+      state.isLoadingLHS = false;
+    }
+  }
+
+  async function saveLHSSettings(guildId, state) {
+    if (!guildId) {
+      state.statusMessage = "Missing guild id.";
+      return;
+    }
+
+    // Build payload
+    const categories = {};
+    for (const cat of LHS_CATEGORIES) {
+      const catSettings = state.lhsSettings.categories[cat.id] || {};
+      categories[cat.id] = {
+        enabled: catSettings.enabled !== false,
+        threshold: catSettings.threshold || state.lhsSettings.global_threshold,
+      };
+    }
+
+    const payload = {
+      enabled: state.lhsSettings.enabled,
+      global_threshold: state.lhsSettings.global_threshold,
+      categories: categories,
+      exempt_roles: parseCommaSeparated(state.lhsSettings.exemptRoleIds).map(id => parseInt(id, 10)).filter(Boolean),
+      exempt_channels: parseCommaSeparated(state.lhsSettings.exemptChannelIds).map(id => parseInt(id, 10)).filter(Boolean),
+      exempt_users: parseCommaSeparated(state.lhsSettings.exemptUserIds).map(id => parseInt(id, 10)).filter(Boolean),
+      action: state.lhsSettings.action,
+      severity: state.lhsSettings.severity,
+      log_only_mode: state.lhsSettings.logOnlyMode,
+    };
+
+    state.isSavingLHS = true;
+
+    try {
+      const response = await fetch(
+        `${backendUrl}/api/guilds/lhs-settings?guild_id=${encodeURIComponent(guildId)}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to save LHS settings (${response.status})`);
+      }
+
+      state.statusMessage = "AI Moderation settings saved successfully.";
+      state.lhsSettingsOriginal = JSON.parse(JSON.stringify(state.lhsSettings));
+    } catch (error) {
+      state.statusMessage = error?.message || "Failed to save AI moderation settings.";
+    } finally {
+      state.isSavingLHS = false;
+    }
+  }
+
   async function mountRuleEditor() {
     const state = ensureState();
     const guildId = resolveGuildId(window.location.search);
@@ -2252,7 +2623,7 @@ export function createGuildDashboardController({ backendUrl, appState, defaultIm
     const guildId = resolveGuildId(window.location.search);
 
     renderContent();
-    await Promise.all([loadRules(guildId, state), loadSettings(guildId, state)]);
+    await Promise.all([loadRules(guildId, state), loadSettings(guildId, state), loadLHSSettings(guildId, state)]);
   }
 
   return {
