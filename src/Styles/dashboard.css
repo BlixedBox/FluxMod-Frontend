@@ -269,6 +269,21 @@
   box-shadow: 0 12px 22px rgba(5, 14, 31, 0.34);
 }
 
+.action-btn:disabled,
+.action-btn[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: saturate(0.65);
+  box-shadow: none;
+  transform: none;
+}
+
+.action-btn:disabled:hover,
+.action-btn[disabled]:hover {
+  box-shadow: none;
+  transform: none;
+}
+
 .warning-banner {
   background: linear-gradient(145deg, rgba(244, 183, 74, 0.18) 0%, rgba(198, 121, 27, 0.14) 100%);
   border: 1px solid rgba(244, 183, 74, 0.4);

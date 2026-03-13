@@ -288,8 +288,6 @@ export function renderDashboardPage(user, defaultImage) {
             <ul>
               <li><a class="sidebar-active"><i class="fa-solid fa-server"></i><span>Servers</span></a></li>
             </ul>
-            <span class="section-title">AutoMod Features</span>
-            <a class="sidebar-nav"><i class="fa-solid fa-file-shield"></i><span>Audit Logs</span></a>
           </div>
         </nav>
       </aside>
@@ -307,6 +305,7 @@ export function renderDashboardPage(user, defaultImage) {
 export function renderGuildDashboardPage() {
   return `
     <section class="dashboard guild-dashboard-layout">
+      <aside class="sidebar guild-dashboard-sidebar" id="guild-dashboard-sidebar"></aside>
       <main class="main-content guild-settings-page" id="guild-dashboard-root"></main>
     </section>
   `;
@@ -315,6 +314,7 @@ export function renderGuildDashboardPage() {
 export function renderRuleEditorPage() {
   return `
     <section class="dashboard guild-dashboard-layout">
+      <aside class="sidebar guild-dashboard-sidebar" id="guild-rule-editor-sidebar"></aside>
       <main class="main-content guild-settings-page" id="guild-rule-editor-root"></main>
     </section>
   `;
