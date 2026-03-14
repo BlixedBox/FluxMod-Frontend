@@ -439,15 +439,6 @@ const LHS_CATEGORY_IDS = [
 
 const DEFAULT_LHS_THRESHOLD = 0.55;
 
-function pickDefinedValue(...candidates) {
-  for (const candidate of candidates) {
-    if (candidate !== undefined && candidate !== null) {
-      return candidate;
-    }
-  }
-  return undefined;
-}
-
 function normalizeCategorySettings(categories = {}) {
   const normalized = {};
   
