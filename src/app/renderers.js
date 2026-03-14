@@ -267,8 +267,8 @@ export function renderDashboardPage(user, defaultImage) {
         : "";
 
       const inviteUrl = guildId
-        ? `https://web.fluxmod.app/oauth2/authorize?client_id=1475487256413421606&scope=bot&permissions=4504699407788166&guild_id=${encodeURIComponent(guildId)}`
-        : "https://web.fluxmod.app/oauth2/authorize?client_id=1475487256413421606&scope=bot&permissions=4504699407788166";
+        ? `https://web.fluxer.app/oauth2/authorize?client_id=1475487256413421606&scope=bot&permissions=4504699407788166&guild_id=${encodeURIComponent(guildId)}`
+        : "https://web.fluxer.app/oauth2/authorize?client_id=1475487256413421606&scope=bot&permissions=4504699407788166";
 
       const inviteAction = !botInstalled
         ? `<a class="dashboard-card-add-btn" href="${escapeHtml(inviteUrl)}" target="_blank" rel="noreferrer noopener">Add FluxMod</a>`
